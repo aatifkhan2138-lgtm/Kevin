@@ -1,217 +1,196 @@
 #include "advanced_cheat_menu.h"
+#include "anti_detect.h"
 #include <imgui.h>
 
-AdvancedCheatMenu::AdvancedCheatMenu()
-    : menuOpen(true), espEnabled(false), aimbotEnabled(false),
-      silentAimEnabled(false), espScanRadius(500.0f),
-      espDrawBox(true), espDrawHealth(true), espDrawDistance(true),
-      aimbotSensitivity(1.0f), aimbotFOV(30.0f), aimbotModeSelected(0),
-      silentAimFireRate(0.1f), silentAimModeSelected(0),
-      silentAimHitboxSelected(0), silentAimSmoothing(0.8f),
-      autoFireEnabled(false), triggerbotEnabled(false) {
-}
-
-AdvancedCheatMenu::~AdvancedCheatMenu() {
-}
-
-void AdvancedCheatMenu::render() {
-    if (!menuOpen) return;
+class FullCheatMenu {
+private:
+    ESPSystem espSystem;
+    AimbotSystem aimbotSystem;
+    SilentAimSystem silentAimSystem;
+    AntiDetectSystem antiDetectSystem;
     
-    ImGui::SetNextWindowSize(ImVec2(500, 700), ImGuiCond_FirstUseEver);
-    if (ImGui::Begin("Kevin Advanced Cheat Menu", &menuOpen, ImGuiWindowFlags_NoMove)) {
-        renderMainMenu();
+    bool menuOpen;
+    bool espEnabled;
+    bool aimbotEnabled;
+    bool silentAimEnabled;
+    bool antiDetectEnabled;
+    
+    // Settings
+    float espScanRadius;
+    float aimbotSensitivity;
+    float silentAimFireRate;
+    
+    int aimbotModeSelected;
+    int silentAimModeSelected;
+    int silentAimHitboxSelected;
+    
+public:
+    FullCheatMenu() 
+        : menuOpen(true), espEnabled(false), aimbotEnabled(false),
+          silentAimEnabled(false), antiDetectEnabled(false),
+          espScanRadius(500.0f), aimbotSensitivity(1.0f),
+          silentAimFireRate(0.1f), aimbotModeSelected(0),
+          silentAimModeSelected(0), silentAimHitboxSelected(0) {
+    }
+    
+    void render() {
+        if (!menuOpen) return;
+        
+        ImGui::SetNextWindowSize(ImVec2(600, 850), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Kevin Complete System", &menuOpen)) {
+            renderHeader();
+            ImGui::Separator();
+            
+            if (ImGui::CollapsingHeader("Protection & Bypass", ImGuiTreeNodeFlags_DefaultOpen)) {
+                renderAntiDetectSettings();
+            }
+            
+            if (ImGui::CollapsingHeader("ESP Settings")) {
+                renderESPSettings();
+            }
+            
+            if (ImGui::CollapsingHeader("Aimbot Settings")) {
+                renderAimbotSettings();
+            }
+            
+            if (ImGui::CollapsingHeader("Silent Aim Settings")) {
+                renderSilentAimSettings();
+            }
+            
+            if (ImGui::CollapsingHeader("Debug Info")) {
+                renderDebugInfo();
+            }
+            
+            ImGui::End();
+        }
+    }
+    
+    void renderHeader() {
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "=== KEVIN COMPLETE SYSTEM ===");
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "With Ban Protection & Bypass");
+        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "!!! EDUCATIONAL USE ONLY !!!");
+    }
+    
+    void renderAntiDetectSettings() {
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "ANTI-DETECTION SETTINGS");
+        
+        if (ImGui::Checkbox("Enable Protection System##main", &antiDetectEnabled)) {
+            if (antiDetectEnabled) {
+                antiDetectSystem.enable();
+            } else {
+                antiDetectSystem.disable();
+            }
+        }
+        
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), 
+                          antiDetectEnabled ? "PROTECTED" : "UNPROTECTED");
         
         ImGui::Separator();
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Anti-Cheat Bypass Options:");
         
-        if (ImGui::CollapsingHeader("ESP Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-            renderESPSettings();
+        if (ImGui::Button("Apply EAC Bypass", ImVec2(150, 0))) {
+            antiDetectSystem.evadeEAC();
+        }
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Apply BattlEye Bypass", ImVec2(150, 0))) {
+            antiDetectSystem.evadeBattlEye();
+        }
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Apply VAC Bypass", ImVec2(120, 0))) {
+            antiDetectSystem.evadeVAC();
         }
         
-        if (ImGui::CollapsingHeader("Aimbot Settings")) {
-            renderAimbotSettings();
+        if (ImGui::Button("Apply WinGuard Bypass", ImVec2(150, 0))) {
+            antiDetectSystem.evadeWinGuard();
+        }
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Apply XignCode Bypass", ImVec2(150, 0))) {
+            antiDetectSystem.evadeXignCode();
         }
         
-        if (ImGui::CollapsingHeader("Silent Aim Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-            renderSilentAimSettings();
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Memory Protection:");
+        
+        if (ImGui::Button("Obfuscate Memory##protect", ImVec2(140, 0))) {
+            antiDetectSystem.obfuscateMemory();
+        }
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Hide Module##protect", ImVec2(140, 0))) {
+            antiDetectSystem.hideModuleFromList();
+        }
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Spoof Signature##protect", ImVec2(140, 0))) {
+            antiDetectSystem.spoofModuleSignature();
         }
         
-        if (ImGui::CollapsingHeader("Debug Info")) {
-            renderDebugInfo();
-        }
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Status Info:");
+        ImGui::Text("Protection: %s", antiDetectSystem.isEnabled() ? "ACTIVE" : "INACTIVE");
+        ImGui::Text("Last Status: %s", antiDetectSystem.getLastBypassStatus());
+        ImGui::Text("Bypasses Applied: %d", antiDetectSystem.getSuccessfulBypassCount());
+    }
+    
+    void renderESPSettings() {
+        ImGui::Checkbox("ESP Enabled##main", &espEnabled);
+        ImGui::SliderFloat("Scan Radius##esp", &espScanRadius, 50.0f, 1000.0f);
+        ImGui::Text("Detected Enemies: %zu", espSystem.getEnemies().size());
+    }
+    
+    void renderAimbotSettings() {
+        ImGui::Checkbox("Aimbot Enabled##main", &aimbotEnabled);
         
-        ImGui::End();
-    }
-}
-
-void AdvancedCheatMenu::renderMainMenu() {
-    ImGui::Text("=== KEVIN ADVANCED CHEAT SYSTEM ===");
-    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Educational Purpose Only");
-    ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "WARNING: Use at own risk!");
-    
-    ImGui::Separator();
-    
-    if (ImGui::Checkbox("ESP Enabled##main", &espEnabled)) {
-        if (espEnabled) {
-            espSystem.scanScreen();
-        }
-    }
-    ImGui::SameLine();
-    
-    if (ImGui::Checkbox("Aimbot Enabled##main", &aimbotEnabled)) {
-        if (aimbotEnabled) {
-            aimbotSystem.enable();
-        } else {
-            aimbotSystem.disable();
-        }
-    }
-    ImGui::SameLine();
-    
-    if (ImGui::Checkbox("Silent Aim Enabled##main", &silentAimEnabled)) {
-        if (silentAimEnabled) {
-            silentAimSystem.enable();
-        } else {
-            silentAimSystem.disable();
-        }
-    }
-}
-
-void AdvancedCheatMenu::renderESPSettings() {
-    ImGui::SliderFloat("ESP Scan Radius##esp", &espScanRadius, 50.0f, 1000.0f);
-    
-    ImGui::Checkbox("Draw Box##esp", &espDrawBox);
-    ImGui::SameLine();
-    ImGui::Checkbox("Draw Health##esp", &espDrawHealth);
-    ImGui::SameLine();
-    ImGui::Checkbox("Draw Distance##esp", &espDrawDistance);
-    
-    ImGui::Text("Detected Enemies: %zu", espSystem.getEnemies().size());
-    
-    Enemy* nearest = espSystem.getNearestEnemy();
-    if (nearest) {
-        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), 
-                          "Nearest Enemy - Distance: %.2f, Health: %.0f", 
-                          nearest->distance, nearest->health);
+        const char* modes[] = {"OFF", "LOCK", "SMOOTH", "PREDICT"};
+        ImGui::Combo("Aimbot Mode##aimbot", &aimbotModeSelected, modes, 4);
+        ImGui::SliderFloat("Sensitivity##aimbot", &aimbotSensitivity, 0.1f, 10.0f);
     }
     
-    if (ImGui::Button("Force Scan##esp")) {
-        espSystem.scanScreen();
+    void renderSilentAimSettings() {
+        ImGui::Checkbox("Silent Aim Enabled##main", &silentAimEnabled);
+        
+        const char* modes[] = {"OFF", "AUTO", "MANUAL", "TRIGGERBOT"};
+        ImGui::Combo("Silent Aim Mode##silentaim", &silentAimModeSelected, modes, 4);
+        
+        const char* hitboxes[] = {"HEAD", "CHEST", "LEGS"};
+        ImGui::Combo("Hitbox##silentaim", &silentAimHitboxSelected, hitboxes, 3);
+        
+        ImGui::SliderFloat("Fire Rate##silentaim", &silentAimFireRate, 0.05f, 1.0f);
     }
-}
-
-void AdvancedCheatMenu::renderAimbotSettings() {
-    const char* aimbotModes[] = {"OFF", "LOCK", "SMOOTH", "PREDICT"};
-    ImGui::Combo("Aimbot Mode##aimbot", &aimbotModeSelected, aimbotModes, 4);
-    aimbotSystem.setMode(static_cast<AimbotMode>(aimbotModeSelected));
     
-    ImGui::SliderFloat("Aimbot Sensitivity##aimbot", &aimbotSensitivity, 0.1f, 10.0f);
-    aimbotSystem.setSensitivity(aimbotSensitivity);
-    
-    ImGui::SliderFloat("Field of View##aimbot", &aimbotFOV, 5.0f, 180.0f);
-    aimbotSystem.setFOV(aimbotFOV);
-    
-    ImGui::Text("Status: %s | Sensitivity: %.2f | FOV: %.1f°", 
-               aimbotModes[aimbotModeSelected], 
-               aimbotSystem.getSensitivity(), 
-               aimbotSystem.getFOV());
-}
-
-void AdvancedCheatMenu::renderSilentAimSettings() {
-    ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "SILENT AIM SETTINGS");
-    
-    const char* silentAimModes[] = {"OFF", "AUTO", "MANUAL", "TRIGGERBOT"};
-    ImGui::Combo("Silent Aim Mode##silentaim", &silentAimModeSelected, silentAimModes, 4);
-    silentAimSystem.setMode(static_cast<SilentAimMode>(silentAimModeSelected));
-    
-    const char* hitboxModes[] = {"HEAD", "CHEST", "LEGS"};
-    ImGui::Combo("Hitbox Target##silentaim", &silentAimHitboxSelected, hitboxModes, 3);
-    silentAimSystem.setHitboxMode(silentAimHitboxSelected);
-    
-    ImGui::SliderFloat("Fire Rate (Auto)##silentaim", &silentAimFireRate, 0.05f, 1.0f);
-    silentAimSystem.setAutoFireRate(silentAimFireRate);
-    
-    ImGui::SliderFloat("Aim Smoothing##silentaim", &silentAimSmoothing, 0.0f, 1.0f);
-    silentAimSystem.setSmoothing(silentAimSmoothing);
-    
-    ImGui::Separator();
-    
-    if (ImGui::Checkbox("Auto Fire##silentaim", &autoFireEnabled)) {
-        if (autoFireEnabled) {
-            silentAimSystem.setMode(SILENT_AIM_AUTO);
-        }
-    }
-    ImGui::SameLine();
-    
-    if (ImGui::Checkbox("Triggerbot##silentaim", &triggerbotEnabled)) {
-        if (triggerbotEnabled) {
-            silentAimSystem.setMode(SILENT_AIM_TRIGGERBOT);
+    void renderDebugInfo() {
+        ImGui::Text("Protection: %s", antiDetectEnabled ? "ACTIVE" : "INACTIVE");
+        ImGui::Text("ESP: %s", espEnabled ? "ACTIVE" : "INACTIVE");
+        ImGui::Text("Aimbot: %s", aimbotEnabled ? "ACTIVE" : "INACTIVE");
+        ImGui::Text("Silent Aim: %s", silentAimEnabled ? "ACTIVE" : "INACTIVE");
+        
+        ImGui::Separator();
+        if (ImGui::Button("Disable All Systems")) {
+            espEnabled = false;
+            aimbotEnabled = false;
+            silentAimEnabled = false;
+            antiDetectEnabled = false;
         }
     }
     
-    ImGui::Text("Successful Shots: %d / %d", 
-               silentAimSystem.getSuccessfulShots(), 
-               silentAimSystem.getTotalShots());
-    
-    ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), 
-                      "Mode: %s | Hitbox: %s | Fire Rate: %.3f", 
-                      silentAimModes[silentAimModeSelected],
-                      hitboxModes[silentAimHitboxSelected],
-                      silentAimFireRate);
-}
-
-void AdvancedCheatMenu::renderDebugInfo() {
-    ImGui::Text("=== DEBUG INFORMATION ===");
-    ImGui::Separator();
-    
-    ImGui::Text("ESP Status: %s", espEnabled ? "ACTIVE" : "INACTIVE");
-    ImGui::Text("Aimbot Status: %s", aimbotEnabled ? "ACTIVE" : "INACTIVE");
-    ImGui::Text("Silent Aim Status: %s", silentAimEnabled ? "ACTIVE" : "INACTIVE");
-    
-    ImGui::Separator();
-    ImGui::Text("Total Enemies: %zu", espSystem.getEnemies().size());
-    ImGui::Text("Total Shots: %d", silentAimSystem.getTotalShots());
-    ImGui::Text("Accuracy: %.1f%%", 
-               silentAimSystem.getTotalShots() > 0 ? 
-               (float)silentAimSystem.getSuccessfulShots() / silentAimSystem.getTotalShots() * 100.0f : 0.0f);
-    
-    ImGui::Separator();
-    
-    if (ImGui::Button("Reset All Statistics")) {
-        espEnabled = false;
-        aimbotEnabled = false;
-        silentAimEnabled = false;
-        aimbotSystem.disable();
-        silentAimSystem.disable();
+    void update() {
+        if (espEnabled) espSystem.updateEnemyList();
+        if (aimbotEnabled) aimbotSystem.update();
+        if (silentAimEnabled) silentAimSystem.update();
     }
-}
+};
 
-void AdvancedCheatMenu::update() {
-    espSystem.updateEnemyList();
-    aimbotSystem.update();
-    silentAimSystem.update();
+int main() {
+    FullCheatMenu menu;
     
-    if (aimbotEnabled) {
-        Enemy* target = espSystem.getClosestToCenter();
-        if (target) {
-            aimbotSystem.aim(target);
-        }
+    while (true) {
+        menu.update();
+        menu.render();
     }
     
-    if (silentAimEnabled) {
-        Enemy* target = espSystem.getClosestToCenter();
-        if (target) {
-            silentAimSystem.fireWithSilentAim(target);
-        }
-    }
-}
-
-ESPSystem& AdvancedCheatMenu::getESP() {
-    return espSystem;
-}
-
-AimbotSystem& AdvancedCheatMenu::getAimbot() {
-    return aimbotSystem;
-}
-
-SilentAimSystem& AdvancedCheatMenu::getSilentAim() {
-    return silentAimSystem;
+    return 0;
 }
