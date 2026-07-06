@@ -1,192 +1,177 @@
-#include "advanced_cheat_menu.h"
+#include "bgmi_esp.h"
 #include "anti_detect.h"
 #include <imgui.h>
+#include <iostream>
 
-class FullCheatMenu {
+class BGMICheatMenu {
 private:
-    ESPSystem espSystem;
-    AimbotSystem aimbotSystem;
-    SilentAimSystem silentAimSystem;
+    GameInterface gameInterface;
+    BGMIESP espSystem;
     AntiDetectSystem antiDetectSystem;
     
     bool menuOpen;
     bool espEnabled;
-    bool aimbotEnabled;
-    bool silentAimEnabled;
-    bool antiDetectEnabled;
-    
-    // Settings
-    float espScanRadius;
-    float aimbotSensitivity;
-    float silentAimFireRate;
-    
-    int aimbotModeSelected;
-    int silentAimModeSelected;
-    int silentAimHitboxSelected;
+    bool connectionActive;
+    float scanRadius;
     
 public:
-    FullCheatMenu() 
-        : menuOpen(true), espEnabled(false), aimbotEnabled(false),
-          silentAimEnabled(false), antiDetectEnabled(false),
-          espScanRadius(500.0f), aimbotSensitivity(1.0f),
-          silentAimFireRate(0.1f), aimbotModeSelected(0),
-          silentAimModeSelected(0), silentAimHitboxSelected(0) {
+    BGMICheatMenu() 
+        : espSystem(&gameInterface), menuOpen(true), espEnabled(false),
+          connectionActive(false), scanRadius(500.0f) {
+    }
+    
+    bool initialize() {
+        // Try to connect to BGMI process
+        if (!gameInterface.initializeConnection()) {
+            return false;
+        }
+        
+        connectionActive = true;
+        return true;
     }
     
     void render() {
         if (!menuOpen) return;
         
-        ImGui::SetNextWindowSize(ImVec2(600, 850), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Kevin Complete System", &menuOpen)) {
-            renderHeader();
+        ImGui::SetNextWindowSize(ImVec2(600, 700), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowBgAlpha(0.9f);
+        
+        if (ImGui::Begin("Kevin BGMI Cheat", &menuOpen, ImGuiWindowFlags_NoMove)) {
+            renderConnectionStatus();
             ImGui::Separator();
             
-            if (ImGui::CollapsingHeader("Protection & Bypass", ImGuiTreeNodeFlags_DefaultOpen)) {
-                renderAntiDetectSettings();
-            }
-            
-            if (ImGui::CollapsingHeader("ESP Settings")) {
+            if (connectionActive) {
                 renderESPSettings();
-            }
-            
-            if (ImGui::CollapsingHeader("Aimbot Settings")) {
-                renderAimbotSettings();
-            }
-            
-            if (ImGui::CollapsingHeader("Silent Aim Settings")) {
-                renderSilentAimSettings();
-            }
-            
-            if (ImGui::CollapsingHeader("Debug Info")) {
-                renderDebugInfo();
+                ImGui::Separator();
+                renderPlayerList();
+                ImGui::Separator();
+                renderProtection();
+            } else {
+                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 
+                                  "NOT CONNECTED TO BGMI!");
+                if (ImGui::Button("Reconnect##main")) {
+                    initialize();
+                }
             }
             
             ImGui::End();
         }
     }
     
-    void renderHeader() {
-        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "=== KEVIN COMPLETE SYSTEM ===");
-        ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "With Ban Protection & Bypass");
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "!!! EDUCATIONAL USE ONLY !!!");
+    void renderConnectionStatus() {
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), 
+                          "=== KEVIN BGMI CHEAT ===");
+        
+        if (connectionActive) {
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), 
+                              "Status: CONNECTED");
+            ImGui::Text("Process ID: %d", gameInterface.getProcessID());
+        } else {
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 
+                              "Status: DISCONNECTED");
+        }
     }
     
-    void renderAntiDetectSettings() {
-        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "ANTI-DETECTION SETTINGS");
+    void renderESPSettings() {
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "ESP SETTINGS");
         
-        if (ImGui::Checkbox("Enable Protection System##main", &antiDetectEnabled)) {
-            if (antiDetectEnabled) {
+        if (ImGui::Checkbox("Enable ESP##main", &espEnabled)) {
+            if (espEnabled) {
+                espSystem.scanPlayers();
+            }
+        }
+        
+        ImGui::SliderFloat("Scan Radius", &scanRadius, 50.0f, 2000.0f);
+        
+        if (ImGui::Button("Scan Now##esp")) {
+            espSystem.updatePlayerList();
+        }
+        
+        ImGui::SameLine();
+        ImGui::Text("Players: %zu", espSystem.getPlayers().size());
+    }
+    
+    void renderPlayerList() {
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "DETECTED PLAYERS");
+        
+        const auto& players = espSystem.getPlayers();
+        
+        if (players.empty()) {
+            ImGui::Text("No players detected");
+            return;
+        }
+        
+        ImGui::BeginTable("PlayerTable", 5, ImGuiTableFlags_Borders);
+        ImGui::TableSetupColumn("ID");
+        ImGui::TableSetupColumn("Health");
+        ImGui::TableSetupColumn("Distance");
+        ImGui::TableSetupColumn("X");
+        ImGui::TableSetupColumn("Y");
+        ImGui::TableHeadersRow();
+        
+        for (const auto& player : players) {
+            if (!player.isAlive) continue;
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("%d", player.playerId);
+            
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextColored(
+                player.health > 50 ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) : ImVec4(1.0f, 0.0f, 0.0f, 1.0f),
+                "%.1f", player.health
+            );
+            
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.1f", player.distance);
+            
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.1f", player.position.x);
+            
+            ImGui::TableSetColumnIndex(4);
+            ImGui::Text("%.1f", player.position.y);
+        }
+        
+        ImGui::EndTable();
+    }
+    
+    void renderProtection() {
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "PROTECTION");
+        
+        static bool protectionEnabled = false;
+        if (ImGui::Checkbox("Enable Anti-Detection##main", &protectionEnabled)) {
+            if (protectionEnabled) {
                 antiDetectSystem.enable();
             } else {
                 antiDetectSystem.disable();
             }
         }
-        
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), 
-                          antiDetectEnabled ? "PROTECTED" : "UNPROTECTED");
-        
-        ImGui::Separator();
-        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Anti-Cheat Bypass Options:");
-        
-        if (ImGui::Button("Apply EAC Bypass", ImVec2(150, 0))) {
-            antiDetectSystem.evadeEAC();
-        }
-        ImGui::SameLine();
-        
-        if (ImGui::Button("Apply BattlEye Bypass", ImVec2(150, 0))) {
-            antiDetectSystem.evadeBattlEye();
-        }
-        ImGui::SameLine();
-        
-        if (ImGui::Button("Apply VAC Bypass", ImVec2(120, 0))) {
-            antiDetectSystem.evadeVAC();
-        }
-        
-        if (ImGui::Button("Apply WinGuard Bypass", ImVec2(150, 0))) {
-            antiDetectSystem.evadeWinGuard();
-        }
-        ImGui::SameLine();
-        
-        if (ImGui::Button("Apply XignCode Bypass", ImVec2(150, 0))) {
-            antiDetectSystem.evadeXignCode();
-        }
-        
-        ImGui::Separator();
-        ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Memory Protection:");
-        
-        if (ImGui::Button("Obfuscate Memory##protect", ImVec2(140, 0))) {
-            antiDetectSystem.obfuscateMemory();
-        }
-        ImGui::SameLine();
-        
-        if (ImGui::Button("Hide Module##protect", ImVec2(140, 0))) {
-            antiDetectSystem.hideModuleFromList();
-        }
-        ImGui::SameLine();
-        
-        if (ImGui::Button("Spoof Signature##protect", ImVec2(140, 0))) {
-            antiDetectSystem.spoofModuleSignature();
-        }
-        
-        ImGui::Separator();
-        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Status Info:");
-        ImGui::Text("Protection: %s", antiDetectSystem.isEnabled() ? "ACTIVE" : "INACTIVE");
-        ImGui::Text("Last Status: %s", antiDetectSystem.getLastBypassStatus());
-        ImGui::Text("Bypasses Applied: %d", antiDetectSystem.getSuccessfulBypassCount());
-    }
-    
-    void renderESPSettings() {
-        ImGui::Checkbox("ESP Enabled##main", &espEnabled);
-        ImGui::SliderFloat("Scan Radius##esp", &espScanRadius, 50.0f, 1000.0f);
-        ImGui::Text("Detected Enemies: %zu", espSystem.getEnemies().size());
-    }
-    
-    void renderAimbotSettings() {
-        ImGui::Checkbox("Aimbot Enabled##main", &aimbotEnabled);
-        
-        const char* modes[] = {"OFF", "LOCK", "SMOOTH", "PREDICT"};
-        ImGui::Combo("Aimbot Mode##aimbot", &aimbotModeSelected, modes, 4);
-        ImGui::SliderFloat("Sensitivity##aimbot", &aimbotSensitivity, 0.1f, 10.0f);
-    }
-    
-    void renderSilentAimSettings() {
-        ImGui::Checkbox("Silent Aim Enabled##main", &silentAimEnabled);
-        
-        const char* modes[] = {"OFF", "AUTO", "MANUAL", "TRIGGERBOT"};
-        ImGui::Combo("Silent Aim Mode##silentaim", &silentAimModeSelected, modes, 4);
-        
-        const char* hitboxes[] = {"HEAD", "CHEST", "LEGS"};
-        ImGui::Combo("Hitbox##silentaim", &silentAimHitboxSelected, hitboxes, 3);
-        
-        ImGui::SliderFloat("Fire Rate##silentaim", &silentAimFireRate, 0.05f, 1.0f);
-    }
-    
-    void renderDebugInfo() {
-        ImGui::Text("Protection: %s", antiDetectEnabled ? "ACTIVE" : "INACTIVE");
-        ImGui::Text("ESP: %s", espEnabled ? "ACTIVE" : "INACTIVE");
-        ImGui::Text("Aimbot: %s", aimbotEnabled ? "ACTIVE" : "INACTIVE");
-        ImGui::Text("Silent Aim: %s", silentAimEnabled ? "ACTIVE" : "INACTIVE");
-        
-        ImGui::Separator();
-        if (ImGui::Button("Disable All Systems")) {
-            espEnabled = false;
-            aimbotEnabled = false;
-            silentAimEnabled = false;
-            antiDetectEnabled = false;
-        }
     }
     
     void update() {
-        if (espEnabled) espSystem.updateEnemyList();
-        if (aimbotEnabled) aimbotSystem.update();
-        if (silentAimEnabled) silentAimSystem.update();
+        if (connectionActive && espEnabled) {
+            espSystem.updatePlayerList();
+        }
+    }
+    
+    bool isConnected() const {
+        return connectionActive;
     }
 };
 
 int main() {
-    FullCheatMenu menu;
+    BGMICheatMenu menu;
     
+    // Initialize connection
+    if (!menu.initialize()) {
+        std::cerr << "Failed to connect to BGMI process!" << std::endl;
+        std::cerr << "Make sure BGMI is running!" << std::endl;
+        return 1;
+    }
+    
+    std::cout << "Successfully connected to BGMI!" << std::endl;
+    
+    // Main loop
     while (true) {
         menu.update();
         menu.render();
